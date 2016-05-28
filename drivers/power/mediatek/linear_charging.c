@@ -21,6 +21,11 @@
  * $Modtime:   11 Aug 2005 10:28:16  $
  * $Log:   //mtkvs01/vmdata/Maui_sw/archives/mcu/hal/peripheral/inc/bmt_chr_setting.h-arc  $
  *
+ * 06 15 2015 wy.chuang
+ * [ALPS02108122] Can't support high voltage charge to 4.35V on linear charger
+ * 	
+ * 	.
+ *
  * 03 10 2015 wy.chuang
  * [ALPS01974124] Device keep popup Power off charging mode notify while using USB cable and connect with Specify USB port
  * .
@@ -63,7 +68,11 @@
 #define BJT_LIMIT			1200000		/* 1.2W */
 #ifndef TA_START_VCHR_TUNUNG_VOLTAG
 #define TA_START_VCHR_TUNUNG_VOLTAGE	3700		/* for isink blink issue */
+#if defined(CONFIG_T93K_PROJ)||defined(CONFIG_T935K_PROJ)
+#define TA_CHARGING_CURRENT		CHARGE_CURRENT_1700_00_MA
+#else
 #define TA_CHARGING_CURRENT		CHARGE_CURRENT_1500_00_MA
+#endif
 #endif	/* TA_START_VCHR_TUNUNG_VOLTAG */
 #endif	/* MTK_PUMP_EXPRESS_SUPPORT */
 
@@ -79,6 +88,13 @@ kal_uint32 		v_cc2topoff_threshold = V_CC2TOPOFF_THRES;
  CHR_CURRENT_ENUM	ulc_cv_charging_current = AC_CHARGER_CURRENT;	
  kal_bool 		ulc_cv_charging_current_flag = KAL_FALSE;
 static bool 		usb_unlimited=false;
+
+#if defined(HIGH_BATTERY_VOLTAGE_SUPPORT)
+	  BATTERY_VOLTAGE_ENUM cv_voltage = BATTERY_VOLT_04_200000_V;
+#else
+	  BATTERY_VOLTAGE_ENUM cv_voltage = BATTERY_VOLT_04_350000_V;
+#endif
+
 
   /* ///////////////////////////////////////////////////////////////////////////////////////// */
   /* // JEITA */
@@ -558,6 +574,7 @@ PMU_STATUS do_jeita_state_machine(void)
 {
 	int previous_g_temp_status;
 	BATTERY_VOLTAGE_ENUM cv_voltage;
+	static int is_cv_init=KAL_FALSE;
 
 	previous_g_temp_status = g_temp_status;
 	/* JEITA battery temp Standard */
@@ -655,9 +672,16 @@ PMU_STATUS do_jeita_state_machine(void)
 	}
 
 	/* set CV after temperature changed */
-	if (g_temp_status != previous_g_temp_status) {
+	if (g_temp_status != previous_g_temp_status|| is_cv_init == KAL_FALSE) {
+	#if defined(CONFIG_T935_PROJ)||defined(CONFIG_T933BA_PROJ)
+		cv_voltage = BATTERY_VOLT_04_375000_V;
+	#elif defined(CONFIG_T93F_ANZHI_PROJ)
+		cv_voltage = BATTERY_VOLT_04_225000_V;
+	#else
 		cv_voltage = select_jeita_cv();
+	#endif
 		battery_charging_control(CHARGING_CMD_SET_CV_VOLTAGE, &cv_voltage);
+		is_cv_init=KAL_TRUE;
 	}
 
 	return PMU_STATUS_OK;
@@ -814,7 +838,11 @@ void select_charging_curret(void)
 			g_temp_CC_value = AC_CHARGER_CURRENT;
 #if defined(CONFIG_MTK_PUMP_EXPRESS_SUPPORT)
 			if(is_ta_connect == KAL_TRUE && ta_vchr_tuning == KAL_TRUE)
-				g_temp_CC_value = CHARGE_CURRENT_1500_00_MA;
+				#if 0//defined(CONFIG_T93K_PROJ)
+					g_temp_CC_value = CHARGE_CURRENT_1700_00_MA;
+				#else
+					g_temp_CC_value = CHARGE_CURRENT_1500_00_MA;
+				#endif
 #endif
 		} else if (BMT_status.charger_type == CHARGING_HOST) 
 		{
@@ -1015,11 +1043,24 @@ static void pchr_turn_on_charging(void)
 
 			/* Set CV */
 #if !defined(CONFIG_MTK_JEITA_STANDARD_SUPPORT)
-#ifdef HIGH_BATTERY_VOLTAGE_SUPPORT
+	#if defined(CONFIG_T935_PROJ)||defined(CONFIG_T933BA_PROJ)
+		cv_voltage = BATTERY_VOLT_04_375000_V;
+	#elif defined(CONFIG_T93F_ANZHI_PROJ)
+	    cv_voltage = BATTERY_VOLT_04_225000_V;
+	#else
+
+		#if defined (CONFIG_HIGH_4400_BATTERY_VOLTAGE_SUPPORT)
+			cv_voltage = BATTERY_VOLT_04_400000_V;
+		#elif defined (HIGH_BATTERY_VOLTAGE_SUPPORT)
+			#if defined(CONFIG_T99H_HAIER_PROJ)||defined(CONFIG_T933BA_PROJ)
+                        cv_voltage = BATTERY_VOLT_04_375000_V;
+			#else
 			cv_voltage = BATTERY_VOLT_04_350000_V;
-#else
+			#endif
+		#else
 			cv_voltage = BATTERY_VOLT_04_200000_V;
-#endif
+		#endif
+	#endif
 			battery_charging_control(CHARGING_CMD_SET_CV_VOLTAGE, &cv_voltage);
 #endif
 		}
@@ -1116,7 +1157,11 @@ PMU_STATUS BAT_TopOffModeAction(void)
 {
 	kal_uint32 charging_enable = KAL_FALSE;
 #ifdef HIGH_BATTERY_VOLTAGE_SUPPORT
-	kal_uint32 cv_voltage = 4350;
+	#if defined(CONFIG_T935_PROJ)||defined(CONFIG_T933BA_PROJ)
+		kal_uint32 cv_voltage = 4375;
+	#else
+		kal_uint32 cv_voltage = 4350;
+	#endif
 #else
 	kal_uint32 cv_voltage = 4200;
 #endif

@@ -1,6 +1,6 @@
 /*****************************************************************************
- *
- * Filename:
+ *  
+ * Filename: 
  * ---------
  *    battery_common.c
  *
@@ -12,11 +12,11 @@
  * ------------
  *   This Module defines functions of mt6323 Battery charging algorithm
  *   and the Anroid Battery service for updating the battery status
- *
+ * 
  * Author:
  * -------
  * Oscar Liu
- *
+ * 
  ****************************************************************************/
 #include <linux/init.h>		/* For init/exit macros */
 #include <linux/module.h>	/* For MODULE_ marcros  */
@@ -78,6 +78,7 @@
 #include "mach/mtk_rtc.h"
 #include <linux/reboot.h>
 
+#include "cust_pmic.h"
 
 
 #if defined(CONFIG_MTK_DUAL_INPUT_CHARGER_SUPPORT)
@@ -1623,6 +1624,43 @@ static void battery_update(struct battery_data *bat_data)
 	battery_log(BAT_LOG_CRTI,
 			    "[kernel][battery_update] SOC %d,UI_SOC2 %d, status %d\n",
 			    BMT_status.SOC,BMT_status.UI_SOC2, bat_data->BAT_STATUS);
+
+#ifdef DLPT_POWER_OFF_EN
+    #ifndef DISABLE_DLPT_FEATURE
+		extern int dlpt_check_power_off(void);
+		if(bat_data->BAT_CAPACITY <= DLPT_POWER_OFF_THD)
+		{
+			static kal_uint8 cnt=0;
+			battery_log(BAT_LOG_CRTI, "[DLPT_POWER_OFF_EN] run\n");
+			
+			//if(bat_data->BAT_CAPACITY==0)
+			//{
+			//	  bat_data->BAT_CAPACITY=1;
+			//	  battery_log(BAT_LOG_CRTI, "[DLPT_POWER_OFF_EN] SOC=0 but keep %d\n", bat_data->BAT_CAPACITY);
+			//}
+			if(dlpt_check_power_off()==1)
+			{
+				bat_data->BAT_CAPACITY=0;
+				cnt++;
+				battery_log(BAT_LOG_CRTI, "[DLPT_POWER_OFF_EN] SOC=%d to power off , cnt=%d \n", bat_data->BAT_CAPACITY,cnt);
+	
+				if(cnt>=2)
+				{
+					kernel_restart("DLPT reboot system");
+				}
+			}
+			else
+			{
+				cnt=0;
+			}
+		}
+		else
+		{
+			battery_log(BAT_LOG_CRTI, "[DLPT_POWER_OFF_EN] disable(%d)\n", bat_data->BAT_CAPACITY);
+		}
+    #endif
+#endif
+	
 	power_supply_changed(bat_psy);
 }
 
@@ -1946,10 +1984,26 @@ void mt_battery_GetBatteryData(void)
 	    mt_battery_average_method(BATTERY_AVG_CURRENT, &batteryCurrentBuffer[0], ICharging, &icharging_sum,
 				      batteryIndex);
 
+	if (previous_SOC == -1 && bat_vol <= V_0PERCENT_TRACKING) {
+		previous_SOC = 0;
+		if (ZCV != 0) {
+			battery_log(BAT_LOG_CRTI,
+					    "battery voltage too low, use ZCV to init average data.\n");
+			BMT_status.bat_vol =
+			    mt_battery_average_method(BATTERY_AVG_VOLT, &batteryVoltageBuffer[0], ZCV, &bat_sum,
+						      batteryIndex);
+		} else {
+			battery_log(BAT_LOG_CRTI,
+					    "battery voltage too low, use V_0PERCENT_TRACKING + 100 to init average data.\n");
+			BMT_status.bat_vol =
+			    mt_battery_average_method(BATTERY_AVG_VOLT, &batteryVoltageBuffer[0], V_0PERCENT_TRACKING + 100, &bat_sum,
+						      batteryIndex);
+		}
+	} else {
 	BMT_status.bat_vol =
 	    mt_battery_average_method(BATTERY_AVG_VOLT, &batteryVoltageBuffer[0], bat_vol, &bat_sum,
 				      batteryIndex);
-
+	}
 	BMT_status.temperature =
 	    mt_battery_average_method(BATTERY_AVG_TEMP, &batteryTempBuffer[0], temperature, &temperature_sum,
 				      batteryIndex);

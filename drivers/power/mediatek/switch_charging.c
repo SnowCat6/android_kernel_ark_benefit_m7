@@ -51,6 +51,13 @@
 #include <mach/diso.h>
 #endif
 
+#include <mach/upmu_common.h>
+#include <mach/upmu_sw.h>
+#include <mach/upmu_hw.h>
+
+#include <linux/gpio.h>
+#include <mach/mt_gpio.h>
+#include "cust_gpio_usage.h"
  /* ============================================================ // */
  /* define */
  /* ============================================================ // */
@@ -68,6 +75,12 @@ CHR_CURRENT_ENUM g_temp_CC_value = CHARGE_CURRENT_0_00_MA;
 CHR_CURRENT_ENUM g_temp_input_CC_value = CHARGE_CURRENT_0_00_MA;
 kal_uint32 g_usb_state = USB_UNCONFIGURED;
 static bool usb_unlimited=false;
+
+#if defined(HIGH_BATTERY_VOLTAGE_SUPPORT)
+	BATTERY_VOLTAGE_ENUM cv_voltage = BATTERY_VOLT_04_200000_V;
+#else
+	BATTERY_VOLTAGE_ENUM cv_voltage = BATTERY_VOLT_04_350000_V;
+#endif
 
   /* ///////////////////////////////////////////////////////////////////////////////////////// */
   /* // PUMP EXPRESS */
@@ -178,7 +191,14 @@ static kal_bool mtk_ta_retry_increase(void)
 	int real_v_chrB;
 	kal_bool retransmit = KAL_TRUE;
 	kal_uint32 retransmit_count=0;
-	
+
+#if defined(CONFIG_NCP1854_DUAL_SUPPORT)
+#if defined(GPIO_NCP1854_SUB_SHUT_PIN)
+     mt_set_gpio_mode(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_NCP1854_SUB_SHUT_PIN_M_GPIO);
+     mt_set_gpio_out(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_OUT_ZERO);
+#endif
+#endif
+
 	do {
 		real_v_chrA = battery_meter_get_charger_voltage();
 		mtk_ta_increase();  //increase TA voltage to 7V
@@ -200,6 +220,13 @@ static kal_bool mtk_ta_retry_increase(void)
 
 	battery_log(BAT_LOG_CRTI, "mtk_ta_retry_increase() real_v_chrA=%d, real_v_chrB=%d, retry=%d\n", 
 	real_v_chrA, real_v_chrB,retransmit_count);
+    
+#if defined(CONFIG_NCP1854_DUAL_SUPPORT)
+#if defined(GPIO_NCP1854_SUB_SHUT_PIN)
+         mt_set_gpio_mode(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_NCP1854_SUB_SHUT_PIN_M_GPIO);
+         mt_set_gpio_out(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_OUT_ONE);
+#endif
+#endif
 
 	if(retransmit_count == 3)
 		return KAL_FALSE;	
@@ -235,6 +262,11 @@ static void mtk_ta_init(void)
 #endif
 
 	battery_charging_control(CHARGING_CMD_INIT,NULL);
+
+#ifdef TA_12V_SUPPORT
+        pmic_set_register_value(PMIC_RG_VCDT_HV_EN,0);//VCDT_HV_EN 
+#endif
+
 }
 
 static void battery_pump_express_charger_check(void)
@@ -261,6 +293,12 @@ static void battery_pump_express_charger_check(void)
 		wake_unlock(&TA_charger_suspend_lock);
 		mutex_unlock(&ta_mutex);
 	} else {
+#if defined(CONFIG_NCP1854_DUAL_SUPPORT)
+#if defined(GPIO_NCP1854_SUB_SHUT_PIN)
+                 mt_set_gpio_mode(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_NCP1854_SUB_SHUT_PIN_M_GPIO);
+                 mt_set_gpio_out(GPIO_NCP1854_SUB_SHUT_PIN,GPIO_OUT_ONE);
+#endif
+#endif
 		battery_log(BAT_LOG_CRTI, 
 		"Stop battery_pump_express_charger_check, SOC=%d, ta_check_chr_type = %d, charger_type = %d \n", 
 		BMT_status.SOC, ta_check_chr_type, BMT_status.charger_type);
@@ -281,6 +319,13 @@ static void battery_pump_express_algorithm_start(void)
 		if(KAL_FALSE == ta_vchr_tuning) {
 			mtk_ta_retry_increase();	/* increase TA voltage to 9V */
 			charger_vol = battery_meter_get_charger_voltage();
+#ifdef TA_12V_SUPPORT
+                    printk("Jay_sart: battery_pump_express_algorithm_start-9v- charer_voltage=%d\n", charger_vol);
+                    msleep(500);
+                     mtk_ta_retry_increase();    /* increase TA voltage to 12V */
+                     charger_vol = battery_meter_get_charger_voltage();                     
+                     printk("Jay_sart: battery_pump_express_algorithm_second_start-12v- charer_voltage=%d\n", charger_vol);
+#endif
 			ta_vchr_tuning = KAL_TRUE;
 		} else if(BMT_status.SOC > TA_STOP_BATTERY_SOC) {
 			/* disable charging, avoid Iterm issue */
@@ -318,7 +363,11 @@ static BATTERY_VOLTAGE_ENUM select_jeita_cv(void)
 		cv_voltage = JEITA_TEMP_POS_45_TO_POS_60_CV_VOLTAGE;
 	} else if (g_temp_status == TEMP_POS_10_TO_POS_45) {
 #ifdef HIGH_BATTERY_VOLTAGE_SUPPORT
-		cv_voltage = BATTERY_VOLT_04_340000_V;
+	#if defined(CONFIG_HCT_04_40V_BAT_SUPPORT)
+		cv_voltage = BATTERY_VOLT_04_400000_V;
+	#else
+		cv_voltage = BATTERY_VOLT_04_350000_V;
+	#endif
 #else
 		cv_voltage = JEITA_TEMP_POS_10_TO_POS_45_CV_VOLTAGE;
 #endif
@@ -467,6 +516,7 @@ void set_usb_current_unlimited(bool enable)
 
 void select_charging_curret_bcct(void)
 {
+      printk("select_charging_curret_bcct: g_bcct_value=%d\n",g_bcct_value);
 	if ((BMT_status.charger_type == STANDARD_HOST) ||
 	    (BMT_status.charger_type == NONSTANDARD_CHARGER)) {
 		if (g_bcct_value < 100)
@@ -485,7 +535,7 @@ void select_charging_curret_bcct(void)
 
 		/* --------------------------------------------------- */
 		/* set IOCHARGE */
-		if (g_bcct_value < 100)
+		if (g_bcct_value < 400)
 			g_temp_CC_value = CHARGE_CURRENT_0_00_MA;
 		else if (g_bcct_value < 650)
 			g_temp_CC_value = CHARGE_CURRENT_550_00_MA;
@@ -501,8 +551,26 @@ void select_charging_curret_bcct(void)
 			g_temp_CC_value = CHARGE_CURRENT_1050_00_MA;
 		else if (g_bcct_value < 1250)
 			g_temp_CC_value = CHARGE_CURRENT_1150_00_MA;
-		else if (g_bcct_value == 1250)
-			g_temp_CC_value = CHARGE_CURRENT_1250_00_MA;
+		else if (g_bcct_value  < 1325)
+			g_temp_CC_value = CHARGE_CURRENT_1300_00_MA;
+		else if (g_bcct_value < 1425)
+			g_temp_CC_value = CHARGE_CURRENT_1400_00_MA;
+		else if (g_bcct_value < 1525)
+			g_temp_CC_value = CHARGE_CURRENT_1500_00_MA;
+		else if (g_bcct_value < 1625)
+			g_temp_CC_value = CHARGE_CURRENT_1600_00_MA;
+		else if (g_bcct_value < 1725)
+			g_temp_CC_value = CHARGE_CURRENT_1700_00_MA;
+		else if (g_bcct_value < 1825)
+			g_temp_CC_value = CHARGE_CURRENT_1800_00_MA;
+		else if (g_bcct_value < 1825)
+			g_temp_CC_value = CHARGE_CURRENT_1900_00_MA;
+		else if (g_bcct_value < 2025)
+			g_temp_CC_value = CHARGE_CURRENT_2000_00_MA;
+		else if (g_bcct_value > 3025)
+			g_temp_CC_value = CHARGE_CURRENT_3000_00_MA;
+    		else if (g_bcct_value > 2525)
+                    g_temp_CC_value = CHARGE_CURRENT_2500_00_MA;
 		else
 			g_temp_CC_value = CHARGE_CURRENT_650_00_MA;
 		/* --------------------------------------------------- */
@@ -510,14 +578,12 @@ void select_charging_curret_bcct(void)
 	} else {
 		g_temp_input_CC_value = CHARGE_CURRENT_500_00_MA;
 	}
-	printk("[BATTERY] sky select_charging_curret_bcct %d !\n",g_temp_CC_value);
-
 }
 
 static void pchr_turn_on_charging(void);
 kal_uint32 set_bat_charging_current_limit(int current_limit)
 {
-	battery_log(BAT_LOG_CRTI, "[BATTERY] set_bat_charging_current_limit (%d)\r\n",
+	printk( "[BATTERY] set_bat_charging_current_limit (%d)\r\n",
 			    current_limit);
 
 	if (current_limit != -1) {
@@ -658,25 +724,22 @@ void select_charging_curret(void)
 
 }
 
-static kal_uint32 charging_full_current = CHARGING_FULL_CURRENT;	/* mA */
+
 static kal_uint32 charging_full_check(void)
 {
-	kal_uint32 status = KAL_FALSE;
-	static kal_uint8 full_check_count = 0;
+	kal_uint32 status;
 
-	if (BMT_status.ICharging <= charging_full_current) {
-		full_check_count++;
-		if (6 == full_check_count) {
-			status = KAL_TRUE;
-			full_check_count = 0;
-			battery_log(BAT_LOG_CRTI,
-					    "[BATTERY] Battery full and disable charging on %d mA\n",
-					    BMT_status.ICharging);
-		}
+	battery_charging_control(CHARGING_CMD_GET_CHARGING_STATUS, &status);
+	if (status == KAL_TRUE) {
+		g_full_check_count++;
+		if (g_full_check_count >= FULL_CHECK_TIMES) {
+			return KAL_TRUE;
+		} else
+			return KAL_FALSE;
 	} else {
-		full_check_count = 0;
+		g_full_check_count = 0;
+		return status;
 	}
-	return status;
 }
 
 
@@ -719,19 +782,16 @@ static void pchr_turn_on_charging(void)
 			g_temp_CC_value = AC_CHARGER_CURRENT;
 			battery_log(BAT_LOG_FULL,
 					    "USB_CURRENT_UNLIMITED, use AC_CHARGER_CURRENT\n");
-		} 
-#if !defined(CONFIG_MTK_FAN5405_SUPPORT)  // aka.jiang add
-		else if (g_bcct_flag == 1) {
+		} else if (g_bcct_flag == 1) {
 			select_charging_curret_bcct();
 
-			battery_log(BAT_LOG_FULL,
-					    "[BATTERY] select_charging_curret_bcct !\n");
-		} 
-#endif
-		else {
+//			battery_log(BAT_LOG_CRTI,
+//					    "[BATTERY] select_charging_curret_bcct !,g_bcct_val = %d \n",g_bcct_value);
+                     printk( "[BATTERY] select_charging_curret_bcct !,g_bcct_val = %d \n",g_bcct_value);
+		} else {
 			select_charging_curret();
 
-			battery_log(BAT_LOG_FULL, "[BATTERY] select_charging_curret !\n");
+			battery_log(BAT_LOG_CRTI, "[BATTERY] select_charging_curret !\n");
 		}
 		battery_log(BAT_LOG_CRTI,
 				    "[BATTERY] Default CC mode charging : %d, input current = %d\r\n",
@@ -751,7 +811,11 @@ static void pchr_turn_on_charging(void)
 			/*Set CV Voltage */
 #if !defined(CONFIG_MTK_JEITA_STANDARD_SUPPORT)
 #ifdef HIGH_BATTERY_VOLTAGE_SUPPORT
-			cv_voltage = BATTERY_VOLT_04_340000_V;
+	#if defined(CONFIG_HCT_04_40V_BAT_SUPPORT)
+		cv_voltage = BATTERY_VOLT_04_400000_V;
+	#else
+		cv_voltage = BATTERY_VOLT_04_350000_V;
+	#endif
 #else
 			cv_voltage = BATTERY_VOLT_04_200000_V;
 #endif
@@ -835,7 +899,10 @@ PMU_STATUS BAT_BatteryFullAction(void)
 
 		BMT_status.bat_in_recharging_state = KAL_TRUE;
 		BMT_status.bat_charging_state = CHR_CC;
+	#ifndef CONFIG_MTK_HAFG_20
 		battery_meter_reset();
+	#endif
+	
 	}
 
 

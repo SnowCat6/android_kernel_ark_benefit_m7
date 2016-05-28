@@ -74,6 +74,8 @@
  #define PS_HIGH 0X1200
  #define PS_LOW  0x1000
 #endif
+ #define PS_HIGH 400
+ #define PS_LOW  800
 
 static struct alsps_hw cust_alsps_hw = {
     .i2c_num    = 2,
