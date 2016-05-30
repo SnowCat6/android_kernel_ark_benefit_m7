@@ -28,49 +28,26 @@
 
 #define FG_METER_RESISTANCE 	0
 
-#if defined(CONFIG_NCP1854_DUAL_SUPPORT)
 /* Qmax for battery  */
-#define Q_MAX_POS_50   5700 //5743
-#define Q_MAX_POS_25   5700 //5734
-#define Q_MAX_POS_0    5564
-#define Q_MAX_NEG_10   5564 //5439
+//D620 battery capacity is 2000mah
+#define Q_MAX_POS_50	1865
+#define Q_MAX_POS_25	1950
+#define Q_MAX_POS_0	1836
+#define Q_MAX_NEG_10	1649
 
-#define Q_MAX_POS_50_H_CURRENT 5700 //5720
-#define Q_MAX_POS_25_H_CURRENT 5700 //5720
-#define Q_MAX_POS_0_H_CURRENT  5439 //5564
-#define Q_MAX_NEG_10_H_CURRENT 5439
-
-#else
-/* Qmax for battery  */
-#define Q_MAX_POS_50	((1872+1812)/2)	// 1872
-#define Q_MAX_POS_25	((1860+1800)/2)	// 1860
-#define Q_MAX_POS_0	((1736+1680)/2)	// 1736
-#define Q_MAX_NEG_10	((1653+1600)/2)	// 1653
-
-#define Q_MAX_POS_50_H_CURRENT	((1842+1783)/2)	// 1842
-#define Q_MAX_POS_25_H_CURRENT	((1807+1749)/2)	// 1807
-#define Q_MAX_POS_0_H_CURRENT	((1568+1518)/2)	// 1568
-#define Q_MAX_NEG_10_H_CURRENT	((852+825)/2)	// 852
-#endif
+#define Q_MAX_POS_50_H_CURRENT	1836
+#define Q_MAX_POS_25_H_CURRENT	1950
+#define Q_MAX_POS_0_H_CURRENT	1662
+#define Q_MAX_NEG_10_H_CURRENT	1092
 
 /* Discharge Percentage */
-#define OAM_D5		 1		//  1 : D5,   0: D2
-
+#define OAM_D5		 0		//  1 : D5,   0: D2
 
 /* battery meter parameter */
-#define CHANGE_TRACKING_POINT
-#ifdef CONFIG_MTK_HAFG_20
-#define CUST_TRACKING_POINT  0
-#else
 #define CUST_TRACKING_POINT  1
-#endif
-#if defined(CONFIG_T93_PROJ)
-#define CUST_R_SENSE         56
-#elif defined(CONFIG_T875_PROJ)
-#define CUST_R_SENSE         30
-#else
+
 #define CUST_R_SENSE         68
-#endif
+
 #define CUST_HW_CC 		    0
 #define AGING_TUNING_VALUE   103
 #define CUST_R_FG_OFFSET    0
@@ -78,13 +55,8 @@
 #define OCV_BOARD_COMPESATE	0 //mV 
 #define R_FG_BOARD_BASE		1000
 #define R_FG_BOARD_SLOPE	1000 //slope
-#if defined(CONFIG_T93_PROJ)
-#define CAR_TUNE_VALUE		84	//100 //1.00
-#elif defined(CONFIG_T875_PROJ)
-#define CAR_TUNE_VALUE		86
-#else
-#define CAR_TUNE_VALUE		100 //1.00
-#endif
+
+#define CAR_TUNE_VALUE		84 //1.00
 
 
 /* HW Fuel gague  */
@@ -126,7 +98,6 @@
 #define CUST_POWERON_MAX_VBAT_TOLRANCE			90
 #define CUST_POWERON_DELTA_VBAT_TOLRANCE		30
 #define CUST_POWERON_DELTA_HW_SW_OCV_CAPACITY_TOLRANCE	10
-
 
 /* Disable Battery check for HQA */
 #ifdef CONFIG_MTK_DISABLE_POWER_ON_OFF_VOLTAGE_LIMITATION

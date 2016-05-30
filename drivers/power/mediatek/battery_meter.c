@@ -1404,7 +1404,9 @@ char hct_battery_info[120];
 char hct_temp_info[50];
 kal_int32 fgauge_compensate_battery_voltage_recursion(kal_int32 ori_voltage, kal_int32 recursion_time);
 
-//extern void hct_add_display_info(char * buffer, int lenth);
+#ifdef CONFIG_HCT_DEVICE_INFO_SUPPORT
+extern void hct_add_display_info(char * buffer, int lenth);
+#endif
 
 
 void dod_init(void)
@@ -1486,13 +1488,12 @@ void dod_init(void)
 
 #endif
 
-//      sprintf(hct_temp_info,"rtc_soc=[%d] bat_rm=%d", g_rtc_fg_soc,is_battery_remove_pmic());
-//      strcat(hct_battery_info, hct_temp_info);
+#ifdef CONFIG_HCT_DEVICE_INFO_SUPPORT
+      sprintf(hct_temp_info,"rtc_soc=[%d] bat_rm=%d", g_rtc_fg_soc,is_battery_remove_pmic());
+      strcat(hct_battery_info, hct_temp_info);
 
-//       hct_add_display_info(hct_battery_info,strlen(hct_battery_info)+1);
-
-
-
+       hct_add_display_info(hct_battery_info,strlen(hct_battery_info)+1);
+#endif
 
 #if defined(IS_BATTERY_REMOVE_BY_PMIC)
 
@@ -1615,9 +1616,10 @@ void dod_init(void)
 #endif
 #endif     
 
- //   sprintf(hct_temp_info,"fnal soc=[%d] bt_md=%d", gFG_capacity_by_v,g_boot_mode);
- //   hct_add_display_info(hct_temp_info,strlen(hct_temp_info)+1);
-
+#ifdef CONFIG_HCT_DEVICE_INFO_SUPPORT
+    sprintf(hct_temp_info,"fnal soc=[%d] bt_md=%d", gFG_capacity_by_v,g_boot_mode);
+    hct_add_display_info(hct_temp_info,strlen(hct_temp_info)+1);
+#endif
 
 	bm_print(BM_LOG_CRTI, "[FGADC] g_rtc_fg_soc=%d, gFG_capacity_by_v=%d\n",
 		 g_rtc_fg_soc, gFG_capacity_by_v);

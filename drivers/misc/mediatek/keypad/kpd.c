@@ -67,6 +67,18 @@ static DECLARE_TASKLET(kpd_slide_tasklet, kpd_slide_handler, 0);
 static u8 kpd_slide_state = !KPD_SLIDE_POLARITY;
 #endif
 
+#ifdef CONFIG_HCT_TP_GESTRUE
+#define TP_GESTURE_KEY                                 KEY_PROG3
+extern void hct_tpd_suspend(void);
+void tpgesture_hander()
+{
+       printk("tpgesture_handler report key\n");
+       input_report_key(kpd_input_dev, TP_GESTURE_KEY, 1);
+       input_report_key(kpd_input_dev, TP_GESTURE_KEY, 0);
+       input_sync(kpd_input_dev);
+       hct_tpd_suspend();
+}
+#endif
 /* for Power key using EINT */
 #if KPD_PWRKEY_USE_EINT
 static void kpd_pwrkey_handler(unsigned long data);
