@@ -30,6 +30,7 @@
 
 /* Qmax for battery  */
 //D620 battery capacity is 2000mah
+/*
 #define Q_MAX_POS_50	1865
 #define Q_MAX_POS_25	1950
 #define Q_MAX_POS_0	1836
@@ -39,6 +40,16 @@
 #define Q_MAX_POS_25_H_CURRENT	1950
 #define Q_MAX_POS_0_H_CURRENT	1662
 #define Q_MAX_NEG_10_H_CURRENT	1092
+*/
+#define Q_MAX_POS_50	2000
+#define Q_MAX_POS_25	1900
+#define Q_MAX_POS_0	1800
+#define Q_MAX_NEG_10	1700
+
+#define Q_MAX_POS_50_H_CURRENT	2100
+#define Q_MAX_POS_25_H_CURRENT	2000
+#define Q_MAX_POS_0_H_CURRENT	1850
+#define Q_MAX_NEG_10_H_CURRENT	1700
 
 /* Discharge Percentage */
 #define OAM_D5		 0		//  1 : D5,   0: D2
